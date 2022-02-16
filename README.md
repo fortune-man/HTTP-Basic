@@ -405,7 +405,7 @@ HTTP 메시지에 다음과 같은 상상할 수 있는 거의 모든 Binary 데
 ***
 
 ### HTTP 메서드
-간단한 HTTP API 설계 예시를 통해 HTTP 메서드에 대해 알아보겠습니다.
+간단한 HTTP API 설계 예시를 통해 HTTP 메서드가 왜 필요한지에 대해 알아보겠습니다.
 #### 요구사항
 "회원 정보 관리 API를 만들어라." 
 - 회원 목록 조회
@@ -1017,6 +1017,459 @@ Accept-Language의 예시를 통해 협상의 사용전과 사용후를 알아�
   
 - [참고](https://datatracker.ietf.org/doc/html/rfc7231#section-5.3.2)
 
+#### 전송 방식
+
+전송 방식은 단순히 4가지로 분류할 수 있습니다.
+
+- 단순 전송
+- 압축 전송
+- 분할 전송
+- 범위 전송
+
+1. 단순 전송 Content-Length
+요청과 응답 발생 시 메시지 바디에 대한 길이를 지정합니다.
+
+![contentLength](https://images.velog.io/images/urtimeislimited/post/2ceacb09-39f2-48ea-babe-1ad45b304401/image.png)
+
+2. 압축 전송 Content-Encoding
+클라이언트의 요청 데이터를 용량이 줄어들도록 압축하고 압축에 대한 정보를 포함하여 전달하면 서버가 해당 데이터의 압축을 해제하여 분석 후 응답 데이터를 전달합니다.
+
+![Content-Encoding](https://images.velog.io/images/urtimeislimited/post/4c8099ff-879f-4f88-8335-3cd5e5d426da/image.png)
+
+3. 분할 전송 Transfer-Encoding
+chunked : 덩어리
+분할된 데이터를 순서대로 전달합니다.
+용량이 큰 데이터의 경우 응답 대기 시간을 단축하기 위해 사용합니다.
+- 참고 : 분할 전송에선 content-length를 포함하면 안됩니다. chunked별로 각각 다른 길이가 지정되기 때문이라고 합니다.
+![Transfer-Encoding](https://images.velog.io/images/urtimeislimited/post/7ddf55b8-61c1-48f9-9164-500eb6bd473b/image.png)
+
+4. 범위 전송 Range, Content-Range
+마찬가지로 큰 용량의 데이터일 경우 요청받는 서버에서 낭비없이 할당할 수 있도록 범위를 지정해서 전송하는 방법입니다.
+
+![Range](https://images.velog.io/images/urtimeislimited/post/5cce85c4-5d2c-4843-9e1c-079942f04c15/image.png)
+
+#### 일반 정보
+쉽고 단순한 HTTP 헤더의 일반 정보들은 다음과 같습니다.
+- From: 유저 에이전트의 이메일 정보
+  - 일반적으로 잘 사용되진 않지만, 검색 엔진 같은 곳에서 주로 사용한다고 합니다.(ex. 크롤링 거부)
+  - 요청에서 사용합니다.
+- Referer: 현재 요청된 페이지의 이전 웹 페이지 주소
+  - 예를 들어 Google -> Naver로 이동하는 경우 Naver를 요청할 때 Referer: Google을 포함해서 요청합니다.
+  - Referer을 사용해서 유입 경로를 분석할 때 많이 사용한다고 합니다.
+  - 요청에서 사용합니다.
+  - 참고 : refer는 단어 rederer(참조자)의 오타입니다.
+- User-Agent: 유저 에이전트 애플리케이션 정보
+  - user-agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/
+537.36 (KHTML, like Gecko) Chrome/86.0.4240.183 Safari/537.36
+  - 클라이언트의 애플리케이션 정보(웹 브라우저 정보..)를 의미합니다.
+  - 서버 입장에서 버그를 발견했을 때 로그를 파싱해서 특정 브라우저의 장애 여부를 파악 가능합니다.
+  - 사용자들의 브라우저 접근 경로를 통계내는데에도 사용할 수 있습니다.
+  - 요청에서 사용합니다.
+  
+- Server: 요청을 처리하는 ORIGIN 서버의 소프트웨어 정보
+  - ORIGIN : HTTP에서 요청 시 중간에 여러 프록시 서버들을 거치게 됩니다. 프록시 서버를 거치고 나서 요청에 해당하는 표현 데이터를 생성해서 응답해주는 마지막 서버를 ORIGIN 서버라고 합니다.  서버의 소프트웨어 정보는 다음과 같습니다.
+  - Server: Apache/2.2.22 (Debian)
+  - server: nginx
+  - 응답에서 사용합니다.
+- Date: 메시지가 발생한 날짜와 시간
+  - 예) Date: Tue, 15 Nov 1994 08:12:31 GMT
+  - 응답에서 사용(과거에는 요청에서도 사용했지만 최신 스펙에서는 응답에서만 사용하도록 변경되었습니다.)
+
+#### 특별한 정보
+실제 애플리케이션에 영향을 주는 특별한 정보를 의미하는 HTTP 헤더는 다음과 같습니다.
+
+- Host: 요청한 호스트 정보(도메인)
+- Location: 페이지 리다이렉션
+- Allow: 허용 가능한 HTTP 메서드
+- Retry-After: 유저 에이전트가 다음 요청을 하기까지 기다려야 하는 시간
+
+1. Host: 요청한 호스트 정보(도메인)
+- 요청에서 사용합니다.
+- __필수__값입니다.
+- IP로만 통신할 경우 하나의 서버에서 여러 도메인을 구분할 수 없습니다.
+- 하나의 서버가 여러 도메인을 처리해야 할 때 구분하기 위해 사용합니다.
+- 하나의 IP 주소에 여러 도메인들이 적용되어 있을 때 사용합니다.
+![host](https://images.velog.io/images/urtimeislimited/post/b015eddf-8810-4703-8e87-1d5614ff2206/image.png)
+
+2. Location : 페이지 리다이렉션
+- 웹 브라우저는 3xx 응답 결과에 Location 헤더가 있으면, Location 위치로 자동 이동합니다.(리다이렉트)
+- 응답코드 3xx 설명 다시 볼 것
+- 201 (Created): 201에서 사용할 경우 Location 값은 요청에 의해 생성된 리소스 URI를 뜻합니다.
+- 3xx (Redirection): Location 값은 요청을 자동으로 리디렉션하기 위한 대상 리소스를
+가리킵니다.
+
+3. Allow : 허용 가능한 HTTP 메서드
+- 405 (Method Not Allowed) 에서 응답에 포함해야합니다.
+- 예) 경로는 있는데 POST를 제공하지 않을 경우
+405 에러를 보내면서 응답에 다음과 같이 지원하는 Allow를 포함시켜 인식하도록 해야합니다.
+- Allow: GET, HEAD, PUT
+
+4. Retry-After : 유저 에이전트가 다음 요청을 하기까지 기다려야 하는 시간
+- 503 (Service Unavailable): 서비스가 언제까지 불능인지 알려줄 수 있습니다.
+- Retry-After: Fri, 31 Dec 1999 23:59:59 GMT (날짜 표기)
+- Retry-After: 120 (초단위 표기)
+
+#### 인증
+인증과 관련된 헤더는 다음과 같습니다.
+
+- Authorization: 클라이언트 인증 정보를 서버에 전달할 수 있습니다.
+  - 예) Authorization: Basic xxxxxxxxxxxxxxxx
+  - 참고 : 인증 방식은 다양합니다.(OAuth..) 각각 입력값이 다르기 때문에 추가 학습이 필요합니다.
+
+- WWW-Authenticate: 리소스 접근시 필요한 인증 방법 정의합니다.
+  - 만약 리소스에 접근했는데 인증에 문제가 발생한 경우, 401 Unauthorized 응답과 함께 사용합니다.
+  - 401 오류 시 다음과 같은 헤더를 추가하여 인증을 위해 참조할 수 있는 정보를 제공합니다.
+  - WWW-Authenticate: Newauth realm="apps", type=1, 
+ title="Login to \"apps\"", Basic realm="simple"
+ 
+#### 쿠키
+
+중요하게 다뤄야하는 "쿠키"의 원리는 다음과 같습니다.
+- Set-Cookie: 서버에서 클라이언트로 쿠키 전달합니다.(응답)
+- Cookie: 클라이언트가 서버에서 받은 쿠키를 저장하고, HTTP 요청시 서버로 전달합니다.
+
+- 예) 방문자 welcome 페이지 접근
+- 방문자 "홍길동"으로 로그인 
+![nonCookie](https://images.velog.io/images/urtimeislimited/post/b5e60943-dfb7-4fc9-a849-30fa22878ecf/image.png)
+- "홍길동" welcome 페이지 접근
+  - 쿠키 미사용시, "안녕하세요. 홍길동님"이 아닌 "안녕하세요. 손님"이라는 응답을 볼 수 있습니다.
+![userHasNonCookie](https://images.velog.io/images/urtimeislimited/post/40ac52cb-c232-4913-9ee7-2e7d2f6af57f/image.png)
+- 서버 입장에서 로그인한 사용자인지 여부를 알 수 없기 때문에 문제가 발생했습니다.
+- 이러한 문제는 무상태 프로토콜을 떠올려보면 왜 생겼는지 알 수 있습니다.
+- Stateless
+  - HTTP는 기본적으로 무상태(Stateless) 프로토콜입니다.
+  - 클라이언트와 서버가 요청과 응답을 주고 받으면 어느정도 연결이 지속되긴 하지만 결국 연결이 끊어집니다.
+  - 클라이언트가 다시 요청하면 서버는 이전 요청을 기억하지 못합니다.
+  - __무상태 프로토콜에서 클라이언트와 서버는 서로 상태를 유지하지 기 때문입니다.__
+
+이 문제에 대해  모든 요청에 사용자 정보를 포함하는 대안이 있었습니다.
+  - 하지만 모든 요청과 링크에 사용자 정보를 포함해도 문제가 발생합니다.
+  ![serverHasAllUserInfo](https://images.velog.io/images/urtimeislimited/post/0ace9901-4220-41e0-a53b-beb7361495e3/image.png)
+  - 브라우저를 완전히 종료하고 다시 열면 없어집니다. (요즘은 [웹스토리지](https://developer.mozilla.org/en-US/docs/Web/API/Web_Storage_API)에 저장하는 것으로 대응한다고 합니다.)
+  - __모든 요청에 사용자 정보가 포함되도록 개발해야 합니다. 너무 많은 비용이 들어간다고 합니다.__
+  
+이것을 해결하기 위해 도입된 것이 __"쿠키"__라고 합니다.
+- 웹 브라우저가 로그인 정보를 요청합니다.
+- 서버는 "Set-Cookie:user=value" 형식의 헤더를 포함한 상태로 응답합니다.
+- 웹 브라우저 내부에 쿠키 저장소에서 로그인 정보를 저장합니다.
+![setCookie](https://images.velog.io/images/urtimeislimited/post/4cecd1b4-45c8-4cec-b9c7-33519669d421/image.png)
+- 로그인 이후 welcome 페이지 접근시 클라이언트가 요청을 보낼 때마다 쿠키 저장소에 접근하는 과정을 반드시 거칩니다.
+- 클라이언트는 쿠키 저장소에서 조회한 값을 참조하여 생성시킨 헤더를 포함하여 요청하게 됩니다.
+![cookieGet](https://images.velog.io/images/urtimeislimited/post/e94c56ce-3d9c-40ca-a2a8-59784153972c/image.png)
+
+쿠키는 매번 모든 요청에 사용자 정보를 포함하도록 개발해야하는 것이 아닌, 쿠키 정보를 자동으로 포함하여 사용할 수 있는 도구입니다.
+
+![cookie](https://images.velog.io/images/urtimeislimited/post/5773e06a-81c5-492d-beba-b4e9bff26237/image.png)
+
+#### 쿠키2
+- 예) __set-cookie__: __sessionId__=abcde1234; __expires__=Sat, 26-Dec-2020 00:00:00 GMT; __path__=/; __domain__=.google.com; __Secure__
+- 쿠키의 사용처
+  - 사용자 로그인 세션을 관리할 때 정말 많이 쓰인다고 합니다.
+  - 광고 정보 트래킹(사용자 취향 파악)에도 많이 사용됩니다.
+- 쿠키 정보는 항상 서버에 전송되기 때문에 다음과 같은 유의사항이 있습니다.
+  - 네트워크 추가 트래픽이 유발됩니다. 
+  - 따라서 최소한의 정보만 사용해야 합니다.(세션 id, 인증 토큰)
+  - 서버에 전송하지 않고 웹 브라우저 내부에 데이터를 저장하고 싶으면 [웹스토리지](https://developer.mozilla.org/en-US/docs/Web/API/Web_Storage_API)(localStorage, sessionStrage)를 사용하면 됩니다.
+  - 주의! : 보안에 민감한 데이터는 저장하면 안됩니다.(주민번호, 신용카드 번호..)
+#### 쿠키 - 생명주기 Expires, max-age
+쿠키를 서버에서 영원히 보관할 수는 없기 때문에 다음과 같은 생명주기가 존재합니다. 
+
+- 세션 쿠키: 만료 날짜를 생략하면 브라우저 종료시 까지만 유지합니다.
+  - 예) Set-Cookie: max-age=3600 (3600초)
+    - 0이나 음수를 지정하면 유효기간 이후에 쿠키 가 자동으로 삭제됩니다.
+  
+- 영속 쿠키: 만료 날짜를 입력하면 해당 날짜까지 유지합니다.
+  - 예) Set-Cookie: expires=Sat, 26-Dec-2020 04:39:21 GMT
+    - 만료일이 되면 쿠키를 자동으로 삭제됩니다.
+
+#### 쿠키 - 도메인 Domain
+쿠키에 도메인을 지정할 수도 있습니다.
+__도메인을 명시__하게 되면 
+__"명시한 문서 기준 도메인 + [서브 도메인](https://ko.wikipedia.org/wiki/%EC%84%9C%EB%B8%8C%EB%8F%84%EB%A9%94%EC%9D%B8)"__
+을 포함해서 적용하게 됩니다.
+- 예) domain=example.org를 지정해서 쿠키 생성
+  - example.org는 물론이고
+  - dev.example.org도 쿠키 접근 후 전송됩니다.
+
+__생략__할 경우, 
+__"현재 문서 기준 도메인"__만 적용됩니다.
+- 예) example.org 에서 쿠키를 생성하고 domain 지정을 생략
+  - example.org 에서만 쿠키 접근
+  - dev.example.org는 쿠키 미접근
+
+#### 쿠키 - 경로 Path
+
+쿠키의 경로를 지정하게 되면 해당 경로를 포함한 하위 경로 페이지만 쿠키가 접근 할 수 있습니다.
+- 예) path=/home
+- 이 경로를 포함한 하위 경로 페이지만 쿠키 접근합니다. (보통 한 도메인에서 쿠키를 전부 전송하길 원하기 때문이라고 합니다.)
+- 일반적으로 path=/ 루트로 지정합니다.
+- 예) path=/home 으로 지정한 경우
+  - path=/home 지정
+  - /home -> 가능
+  - /home/level1 -> 가능
+  - /home/level1/level2 -> 가능
+  - /hello -> 불가능
+
+#### 쿠키 - 보안 Secure, HttpOnly, SameSite
+
+쿠키와 관련된 보안은 다음과 같은 3가지가 있습니다. 
+- [Secure](https://developer.mozilla.org/en-US/docs/Web/HTTP/Cookies)
+  - 원래 쿠키는 http, https를 구분하지 않고 전송 했으나,
+  - Secure를 적용하면 https인 경우에만 클라이언트에서 서버로 쿠키를 전송합니다.
+- [HttpOnly](https://www.cookiepro.com/knowledge/httponly-cookie/)
+  - XSS 공격을 방지하는 방법입니다.
+  - HttpOnly를 적용하면 자바스크립트에서 접근 불가(document.cookie)합니다.
+  - 대신 HTTP 전송에만 사용할 수 있습니다.
+- [SameSite](https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Set-Cookie/SameSite)
+  - XSRF 공격을 방지하는 방법입니다.
+  - 요청 도메인과 쿠키에 설정된 도메인이 같은 경우만 쿠키 전송할 수 있습니다. 서로 다른 경우에 쿠키가 전송되지 않도록 막는 방법입니다.
+  - 지원하게 된지 얼마 안 된 기능이라 브라우저에서 지원 여부를 확인 후 사용해야 한다고 합니다.
+***
+
+### HTTP 헤더2 - 캐시와 조건부 요청
+
+#### 캐시 기본 동작
+캐시가 어떻게 동작하는지부터 알아보겠습니다.
+
+캐시가 없을 때는 다음과 같은 단점들이 있었습니다.
+
+- 데이터가 변경되지 않아도 계속 네트워크를 통해서 데이터를 다운로드 받아야 했습니다.(중복)
+- 인터넷 네트워크는 매우 느리고 비쌉니다.
+- 동일한 요청을 중복해서 수행하게 되니  사용자 입장에서 브라우저 로딩 속도가 느립니다.
+- 즉, 느린 사용자 경험이 발생합니다.
+![nonCache1](https://images.velog.io/images/urtimeislimited/post/0cb8884c-21ec-4076-9704-19bb6565754c/image.png)
+![nonCache2](https://images.velog.io/images/urtimeislimited/post/6729393d-eb1e-4c65-a6fa-ef64d85b3281/image.png)
+
+캐시를 적용하게 되면, 
+- 웹 브라우저에서 헤더에 cache-control(캐시가 유효한 시간 의미(초단위))이란 설정 추가를 통해 서버와 같련된 데이터를 설정합니다.
+- 웹 브라우저 내부 캐시 저장소에 설정한 유효시간만큼 응답 결과를 저장하는 상태를 유지합니다.
+
+![cache1](https://images.velog.io/images/urtimeislimited/post/5253f970-7926-4857-9e16-9668b1304857/image.png)
+- 두 번째 요청 시에 우선 캐시를 유효시간을 검증합니다.
+- 유효시간을 충족할 경우 캐시에 저장된 데이터를 조회하기만 하면 됩니다.
+![cache2](https://images.velog.io/images/urtimeislimited/post/cdfb36fb-5562-4ad6-bd19-c0db90d379ad/image.png)
+
+#### 캐시 적용 이후
+- 캐시 덕분에 캐시 가능 시간동안 네트워크를 사용하지 않아도 됩니다.
+- 따라서 비싼 네트워크 사용량을 줄일 수 있습니다.
+- 최소한의 요청만을 수행하기 때문에 브라우저 로딩 속도가 매우 빨라집니다.
+- 즉, 빠른 사용자 경험이 가능해집니다.
+
+#### 캐시 시간 초과
+만약 캐시의 유효 시간이 초과된다면 어떻게 될까요? 당연히 다시 요청하고 응답 결과를 다시 캐시에 저장해야 합니다.
+
+- 서버를 통해 데이터를 다시 조회하고 캐시를 갱신합니다.
+- 이때 다시 네트워크 다운로드가 발생합니다.
+
+만약 캐시가 만료되었어도 클라이언트와 서버가 가진 데이터가 동일하다면, 네트워크 다운로드를 반복할 필요가 없습니다. 이를 해결하기 위한 방법이 있습니다.
+
+#### 검증 헤더와 조건부 요청1
+- 캐시 유효시간이 초과해서 서버에 요청하면 다음 두 가지 상황이 나타납니다.
+  1. 서버에서 기존 데이터를 변경한 경우
+  2. 서버에서 기존 데이터를 변경하지 않은 경우
+    - 생각해보면 데이터를 전송하는 대신 저장해두었던 캐시를 재사용할 수 있습니다.
+    - 단, 클라이언트와 서버의 데이터가 같다는 사실을 확인할 수 있는 방법이 필요합니다. 이를 위해 "검증 헤더"를 추가합니다.
+    
+#### 검증 헤더 추가
+
+검증 헤더란 "데이터가 마지막에 수정된 시간"에 대한 정보를 Last-Modified라는 형식으로 헤더에 추가해주면 브라우저 캐시는 다음과 같은 내용을 저장합니다.
+- 응답 결과를 캐시에 저장하는 것 뿐만 아니라
+- 서버에 데이터 최종 수정일을 포함하여 저장합니다.
+![verificationHeader](https://images.velog.io/images/urtimeislimited/post/46e98e6e-3484-41aa-9118-ef0c1ef7fac5/image.png)
+
+캐시 시간 초과 이후 클라이언트가
+"if-modified-since:"라는 헤더를 추가하게 되면 포함된 헤더의 정보를 읽은 서버가 데이터 수정일의 동일 여부를 통해 검증합니다.
+![modified](https://images.velog.io/images/urtimeislimited/post/709fd67d-c130-411c-ac48-eb90d849af3e/image.png)
+
+- 서버는 데이터 변경이 되지 않았을 경우 "304 Not Modified"를 통해 알려주면서 동일한 데이터를 응답합니다. 이 때, HTTP Body는 존재하지 않습니다.(수정되지 않았기 때문에) 
+- 따라서 데이터와 네트워크 부하의 최소화만을 허용합니다.
+![modified2](https://images.velog.io/images/urtimeislimited/post/6fdd32d8-60f8-493d-9bbd-5ba7b470cca5/image.png)
+- 검증 여부를 참조하여 브라우저는 캐시를 다시 설정하고 브라우저 캐시 저장소에서 데이터를 조회하여 재사용합니다.
+![reuseCache](https://images.velog.io/images/urtimeislimited/post/2235a6f2-afc3-44dc-be82-1a1bdf6ffa57/image.png)
+
+> 검증 헤더(Last-Modified)와 조건부 요청(if-modified-since)은 같이 사용됩니다.
+- 캐시 유효 시간이 초과해도 서버의 데이터가 갱신되지 않으면 304 Not Modified + 헤더 메타 정보만 응답합니다. (BODY 미포함)
+- 클라이언트는 서버가 보낸 응답 헤더 정보로 캐시의 메타 정보를 갱신합니다.
+- 클라이언트는 캐시에 저장되어 있는 데이터를 재활용할 수 있습니다.
+- 네트워크 다운로드가 발생하긴 하지만, 용량이 적은 헤더 정보만 다운로드 하기 때문에 굉장히 실용적인 해결책이라고 할 수 있습니다.
+- 웹 브라우저들은 대부분 이 메커니즘을 실행하고 있다고 합니다.
+
+#### 검증 헤더와 조건부 요청2
+검증 헤더와 조건부 요청에 대해 자세히 알아보겠습니다.
+
+- __검증 헤더__
+  - 캐시 데이터와 서버 데이터가 같은지 검증하는 데이터입니다.
+  - 크게 2가지가 있습니다. (Last-Modified, ETag)
+- __조건부 요청 헤더__
+  - 검증 헤더로 조건에 따른 분기를 서버에 요청합니다.
+  - If-Modified-Since: Last-Modified 사용
+  - If-None-Match: ETag 사용
+  - 조건이 만족하면 200 OK,
+  - 조건이 만족하지 않으면 304 Not Modified입니다.
+  
+예시)
+- If-Modified-Since : 이후에 데이터가 수정되었으면?
+- __데이터 미변경 예시__
+  - 캐시: 2020년 11월 10일 10:00:00 vs 서버: 2020년 11월 10일 10:00:00
+  - __304 Not Modified__, 헤더 데이터만 전송(BODY 미포함)
+  - 전송 용량 0.1M (헤더 0.1M, 바디 1.0M)
+- __데이터 변경 예시__
+  - 캐시: 2020년 11월 10일 10:00:00 vs 서버: 2020년 11월 10일 __11__:00:00
+  - __200 OK__, 모든 데이터 전송(BODY 포함)
+  - 전송 용량 1.1M (헤더 0.1M, 바디 1.0M)
+  
+#### Last-Modified, If-Modified-Since 단점
+
+- 1초 미만(0.x초) 단위로 캐시 조정이 불가능합니다.
+- 날짜 기반의 정해진 로직을 사용합니다.
+- 데이터를 수정해서 날짜가 다르지만, 같은 데이터를 수정해서 데이터 결과가 똑같은 경우
+  - 인식 오류로 전체 데이터를 다시 다운로드하는 단점이 있습니다.
+- 서버에서 별도의 캐시 로직을 관리하고 싶은 경우, 서버에서 완전히 컨트롤할 수 있도록 ETag, If-None-Match을 사용합니다.
+- 예) 스페이스나 주석처럼 크게 영향이 없는 변경에서 캐시를 유지하고 싶은 경우
+
+#### 검증 헤더와 조건부 요청 ETag(Entity Tag)
+- 캐시용 데이터에 날짜가 아닌 임의의 고유한 이름을 달아둘 수 있습니다.
+  - 예) ETag: "v1.0", ETag: "a2jiodwjekjl3"
+- 데이터가 변경되면 이 이름를 바꾸어서(Hash를 다시 생성해서) 변경합니다.
+  - 예) ETag: "aaaaa" -> ETag: "bbbbb"
+- 진짜 단순하게 ETag만 보내서 같으면 유지, 다르면 다시 받습니다.
+![Etag1](https://images.velog.io/images/urtimeislimited/post/31552f72-f97e-4f49-a0c2-b6f2485e8c82/image.png)
+![Etag2](https://images.velog.io/images/urtimeislimited/post/0e9a2292-7461-4620-b96e-3fa48c6b2ec5/image.png)
+> ETag, If-None-Match
+- 진짜 단순하게 ETag만 서버에 보내서 같으면 유지, 다르면 다시 받습니다.
+- __캐시 제어 로직을 서버에서 완전히 관리__합니다.
+- 클라이언트는 단순히 이 값을 서버에 제공(클라이언트는 캐시 메커니즘을 모름)합니다.
+- 예)
+- 서버는 배타 오픈 기간인 3일 동안 파일이 변경되어도 ETag를 동일하게 유지하고
+- 애플리케이션 배포 주기에 맞추어 ETag 모두 갱신할 수 있습니다.
+
+#### 캐시와 조건부 요청 헤더
+
+캐시는 다음과 같은 __캐시 제어 헤더__가 있습니다.
+
+- Cache-Control: 캐시 제어
+- Pragma: 캐시 제어(하위 호환)
+- Expires: 캐시 유효 기간(하위 호환)
+
+1. Cache-Control: 캐시 제어(directives)
+- Cache-Control: max-age
+- 캐시 유효 시간을 뜻하며, 초 단위를 사용합니다.
+- Cache-Control: no-cache
+- 데이터는 캐시해도 되지만, 항상 원(origin) 서버에 반드시 검증하고 사용해야 합니다.
+- Cache-Control: no-store
+- 데이터에 민감한 정보가 있으므로 저장하면 안된다는 의미입니다. (메모리에서 사용하고 최대한 빨리 삭제)
+
+2. Pragma: 캐시 제어(하위 호환)
+
+- Pragma: no-cache
+- HTTP 1.0 하위 호환
+- 지금은 거의 사용하지 않고 하위 호환 때문에 필요하면 사용한다고 합니다.
+
+3. Expires: 캐시 만료일 지정(하위 호환)
+캐시 유효시간이 아닌 만료일 지정을 통해 제어합니다. 초 단위가 훨씬 유형하기 때문에 Expires는 하위 호환입니다.
+- 예) expires: Mon, 01 Jan 1990 00:00:00 GMT
+- 캐시 만료일을 정확한 날짜로 지정하는 기능입니다.
+- HTTP 1.0 부터 사용해왔습니다.
+- 지금은 더 유연한 Cache-Control: max-age 권장합니다.
+- Cache-Control: max-age와 함께 사용하면 Expires는 무시됩니다.
+
+>검증 헤더와 조건부 요청 헤더
+- 검증 헤더 (Validator) 
+  - ETag: "v1.0", ETag: "asid93jkrh2l"
+  - Last-Modified: Thu, 04 Jun 2020 07:19:24 GMT
+- 조건부 요청 헤더
+  - If-Match, If-None-Match: ETag 값 사용
+  - If-Modified-Since, If-Unmodified-Since: Last-Modified 값 사용
 
 
+#### 프록시 캐시
 
+한국에 있는 다수의 클라이언트가 미국에 있는 origin 서버에 접근하면 각 클라이언트들은 다운로드 시간이 지연되어 느린 사용자 경험이 발생할 수 있습니다.
+
+![onlyOrigin](https://images.velog.io/images/urtimeislimited/post/a28acc89-c0d9-4558-95f2-df9e0f91ff54/image.png)
+
+프록시 캐시 라는 서버를 한국 어딘가에 도입해서 우선적으로 요청을 처리하도록 지원하면 미국의 원 서버가 아니라 한국 웹 브라우저에서 프록시 캐시 서버를 먼저 접근하게 되고 가까이 있는만큼 빠른 응답이 가능해집니다.
+예) 유튜브 한국 컨텐츠와 해외 컨텐츠는 로딩 속도가 크게 차이난다고 합니다.
+![proxy](https://images.velog.io/images/urtimeislimited/post/6ae8b24f-4608-4f3e-a9f3-d6f784721a01/image.png)
+
+- private 캐시 : 웹 브라우저 로컬에 저장되는 캐시를 의미합니다.
+- public 캐시 : 중간에서 공용 목적으로 저장되는 캐시를 의미합니다.
+(보통 두번째 브라우저부터 빠르게 조회할 수 있도록 하거나 또는 원 서버에서 캐시에 데이터를 넘겨주는 경우도 있다고 합니다.)
+![private&public](https://images.velog.io/images/urtimeislimited/post/05bbcf4d-8a48-493a-82aa-575813b7003d/image.png)
+
+
+#### Cache-Control :캐시 지시어(directives) - 기타
+
+- Cache-Control: public 
+  - 응답이 public 캐시에 저장되어도 된다는 의미입니다.
+- Cache-Control: private 
+  - 응답이 해당 사용자만을 위한 것이라는 의미이므로, private 캐시에 저장해야 합니다.(기본값)
+- Cache-Control: s-maxage 
+  - 프록시 캐시에만 적용되는 max-age
+- Age: 60 (HTTP 헤더)
+  - 오리진 서버에서 응답 후 프록시 캐시 내에 머문 시간(초)을 의미합니다.
+
+#### 캐시 무효화
+
+#### Cache-Control : 확실한 캐시 무효화 응답
+- Q: Cache를 적용 안하면 Cache가 안 되는거 아닌가요? 
+- A: Cache를 적용 안해도 웹 브라우저들이 Get요청 등으로 임의로 캐싱 하기도 한다고 합니다. 그래서 절대 캐시가 되면 안 되는 상황에서 무효화 응답을 반드시 포함시켜야 합니다.
+  - 예) 현재 사용자 통장 잔고(갱신될 수 있기 때문에 캐싱하면 안 됩니다.)
+  
+- __Cache-Control: no-cache, no-store, must-revalidate__ 
+- __Pragma: no-cache__ (과거 브라우저)
+- HTTP 1.0 하위 호환
+
+#### Cache-Control
+캐시 지시어(directives) - 확실한 캐시 무효화
+
+- __Cache-Control: no-cache__ 
+  - 데이터는 캐시해도 되지만, 항상 __원 서버에 검증__하고 사용(이름에 주의!)해야 합니다.
+- __Cache-Control: no-store 
+  - 데이터에 민감한 정보가 있으므로 저장하면 안됩니다. (메모리에서 사용하고 최대한 빨리 삭제)
+- __Cache-Control: must-revalidate__ 
+  - 캐시 만료후 최초 조회시 __원 서버에 검증__해야합니다.
+  - 원 서버 접근 실패시 반드시 오류가 발생해야함 - 504(Gateway Timeout)
+  - must-revalidate는 캐시 유효 시간이라면 캐시를 사용함
+- __Pragma: no-cache__ 
+  - HTTP 1.0 하위 호환 (Cache-Control같은 무효화를 모르는 스펙에서 지원)
+
+no-cache로 항상 원 서버에 검증하고 사용하면 될텐데, 왜 must-revalidate를 분류해야 할까요?
+
+#### no-cache vs must-revalidate
+
+no-cache 사용시 항상 원 서버에서 검증해야하기 때문에 프록시 캐시를 거쳐서 검증후 해당 응답합니다.
+![no-cache](https://images.velog.io/images/urtimeislimited/post/43239977-28d5-4632-96cd-9dcbd28c53b4/image.png)
+
+그런데 만약, 순간적으로 프록시 캐시 서버와 원 서버와의 네트워크가 단절된다면? 
+  - 원 서버에 접근이 불가하게 됩니다. 이럴 경우 프록시 서버는 장애 발생보다 오래된 데이터라도 보여주는 선택을 했다고 합니다.
+  
+  ![connectionError](https://images.velog.io/images/urtimeislimited/post/c6362db4-c6e7-4e2c-a20e-1c593d3ad97d/image.png)
+
+네트워크 단절로 원 서버 접근 불가한 상황에서 must-revalidate는 no-cache와 달리, 
+504 Gateway Timeout 에러가 발생하는 것을 보여주도록 스펙에 설명되어있습니다.
+
+![mustRevalidate](https://images.velog.io/images/urtimeislimited/post/8c2329b0-9044-4407-9110-19d2d493776d/image.png)
+
+- 예를 들어 통장 잔고와 같은 민감하고 중요한 데이터는 프록시 캐시에 있는 과거 데이터보다 오류가 발생하는 것이 사용자에게 안정적이라고 합니다.
+
+이러한 차이 때문에 서버 측에서 HTTP 응답 코드를 만들 때에는 확실하게 캐시 무효화 응답을 위해선 no-cache와 must-revalidate를 구분지어야 한다고 합니다.
+
+>Cache-Control : 확실한 캐시 무효화 응답
+- Cache-Control: no-cache, no-store, must-revalidate 
+- Pragma: no-cache 
+- HTTP 1.0 하위 호환
+
+과거부터 스펙이 누적되다보니 조금 복잡할 수 있기 때문에 원리에 대해 알아보는 시간을 가졌습니다.
+
+### 마무리
+추가로 필요한 내용은 지금까지 학습한 내용을 기반으로 필요시 검색을 통한 습득할 수 있습니다.
+(단, 정확하지 않은 자료가 많으므로 항상 의심해야 합니다.)
+
+- HTTP에 대해 더 깊이있게 학습
+1. HTTP 스펙
+  - [RFC 2616](https://datatracker.ietf.org/doc/html/rfc2616)
+  - [RFC 7230~7235](https://datatracker.ietf.org/doc/html/rfc7230)
+2. [HTTP 완벽가이드](http://www.kyobobook.co.kr/product/detailViewKor.laf?mallGb=KOR&ejkGb=KOR&barcode=9788966261208)
+
+- 백엔드 개발자가 사용하는 웹 프레임워크나 기술들은 모두 HTTP 기반으로 구현되어 있습니다.
